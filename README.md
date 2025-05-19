@@ -6,7 +6,7 @@ If you work on very different types of projects, this is a great way to avoid se
 
 ## 🔧 Features:
 - Store your scene templates in a separate folder
-- Quickly load any template via UI or hotkey (F7)
+- Quickly load any template via hotkey (F7)
 - Warns before overwriting the current scene
 - Auto-loads the selected template after saving the current project
 
