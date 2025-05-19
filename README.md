@@ -13,7 +13,8 @@ If you work on very different types of projects, this is a great way to avoid se
 ## 📁 How to Use:
 1. Install the addon via Preferences > Add-ons > Install.
 2. Set the path to your `.blend` template folder in the addon preferences.
-3. Press `F7` or use the Scene Templates panel to load a scene.
+3. Press `F7` (by default) to open the template selector dialog. You can reassign this shortcut in the keymap settings if needed.
+
 
 ---
 
