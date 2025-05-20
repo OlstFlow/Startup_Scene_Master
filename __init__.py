@@ -2,13 +2,17 @@ import bpy
 import os
 import logging
 import rna_keymap_ui
+import shutil
+import tempfile
+import datetime
+from functools import partial
 
 logging.basicConfig(level=logging.DEBUG)
 
 bl_info = {
     "name": "Startup Scene Master",
     "author": "OLST & GPT",
-    "version": (1, 3),
+    "version": (1, 4),          # ↑ номер патча
     "blender": (4, 3, 0),
     "location": "3D View > Sidebar > Scene Templates",
     "description": "Allows quick loading of custom scene templates.",
@@ -18,6 +22,13 @@ bl_info = {
 
 selected_template = None
 addon_keymaps = []
+
+# ---------- helpers ----------------------------------------------------------
+def _deferred_open(filepath):
+    """Функция, которую вызывает таймер; возвращает None, чтобы не перезапускаться"""
+    bpy.ops.wm.open_mainfile(filepath=filepath)
+    return None
+# -----------------------------------------------------------------------------
 
 def get_template_files(self, context):
     preferences = context.preferences.addons[__name__].preferences
@@ -80,22 +91,20 @@ class TEMPLATE_OT_select(bpy.types.Operator):
     def execute(self, context):
         global selected_template
 
-        preferences = context.preferences.addons[__name__].preferences
-        template_directory = bpy.path.abspath(preferences.template_path)
+        prefs = context.preferences.addons[__name__].preferences
+        template_dir = bpy.path.abspath(prefs.template_path)
         template_file = f"{self.choice}.blend"
-        full_path = os.path.join(template_directory, template_file)
+        full_path = os.path.join(template_dir, template_file)
 
         if os.path.exists(full_path):
             if bpy.data.is_saved:
                 bpy.ops.template.confirm('INVOKE_DEFAULT', choice=self.choice)
-                return {'CANCELLED'}
             else:
                 selected_template = self.choice
                 bpy.ops.template.prompt_save('INVOKE_DEFAULT')
-                return {'CANCELLED'}
         else:
-            self.report({'ERROR'}, f"Template file {template_file} not found in {template_directory}")
-            return {'CANCELLED'}
+            self.report({'ERROR'}, f"Template file {template_file} not found in {template_dir}")
+        return {'CANCELLED'}
 
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
@@ -110,26 +119,29 @@ class TEMPLATE_OT_confirm(bpy.types.Operator):
     def execute(self, context):
         global selected_template
 
-        preferences = context.preferences.addons[__name__].preferences
-        template_directory = bpy.path.abspath(preferences.template_path)
+        prefs = context.preferences.addons[__name__].preferences
+        template_dir = bpy.path.abspath(prefs.template_path)
         template_file = f"{self.choice}.blend"
-        full_path = os.path.join(template_directory, template_file)
-
+        source_path = os.path.join(template_dir, template_file)
         selected_template = self.choice
 
-        with open(full_path, 'rb') as src_file, open(bpy.data.filepath, 'wb') as dst_file:
-            dst_file.write(src_file.read())
+        # -- копия во временный файл --
+        tmp_dir = tempfile.gettempdir()
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        tmp_path = os.path.join(tmp_dir, f"SSM_{self.choice}_{stamp}.blend")
+        shutil.copy2(source_path, tmp_path)
 
-        bpy.ops.wm.open_mainfile(filepath=bpy.data.filepath)
+        # -- откроем позже безопасно --
+        bpy.app.timers.register(partial(_deferred_open, tmp_path), first_interval=0.1)
         return {'FINISHED'}
 
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
-        layout = self.layout
-        layout.label(text="Current file will be overwritten!")
-        layout.label(text="All unsaved data will be lost.")
+        col = self.layout
+        col.label(text="Current file will be overwritten!")
+        col.label(text="All unsaved data will be lost.")
 
 class TEMPLATE_OT_prompt_save(bpy.types.Operator):
     bl_idname = "template.prompt_save"
@@ -138,10 +150,8 @@ class TEMPLATE_OT_prompt_save(bpy.types.Operator):
 
     def execute(self, context):
         global selected_template
-
         if selected_template:
             bpy.app.handlers.save_post.append(post_save_load_template)
-
         bpy.ops.wm.save_as_mainfile('INVOKE_DEFAULT')
         return {'FINISHED'}
 
@@ -149,30 +159,31 @@ class TEMPLATE_OT_prompt_save(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
-        layout = self.layout
-        layout.label(text="Please, save the file first.")
+        self.layout.label(text="Please, save the file first.")
 
-def post_save_load_template(dummy):
+def post_save_load_template(_dummy):
     global selected_template
-
     if not selected_template:
         return
 
-    preferences = bpy.context.preferences.addons[__name__].preferences
-    template_directory = bpy.path.abspath(preferences.template_path)
+    prefs = bpy.context.preferences.addons[__name__].preferences
+    template_dir = bpy.path.abspath(prefs.template_path)
     template_file = f"{selected_template}.blend"
-    full_path = os.path.join(template_directory, template_file)
+    source_path = os.path.join(template_dir, template_file)
 
     bpy.app.handlers.save_post.remove(post_save_load_template)
 
-    with open(full_path, 'rb') as src_file, open(bpy.data.filepath, 'wb') as dst_file:
-        dst_file.write(src_file.read())
+    tmp_dir = tempfile.gettempdir()
+    stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    tmp_path = os.path.join(tmp_dir, f"SSM_{selected_template}_{stamp}.blend")
+    shutil.copy2(source_path, tmp_path)
 
-    bpy.ops.wm.open_mainfile(filepath=bpy.data.filepath)
+    bpy.app.timers.register(partial(_deferred_open, tmp_path), first_interval=0.1)
 
+# ---------- keymaps ----------------------------------------------------------
 def register_keymaps():
-    wm = bpy.context.window_manager
-    km = wm.keyconfigs.addon.keymaps.new(name='3D View', space_type='VIEW_3D')
+    km = bpy.context.window_manager.keyconfigs.addon.keymaps.new(
+        name='3D View', space_type='VIEW_3D')
     kmi = km.keymap_items.new("template.select", type='F7', value='PRESS')
     addon_keymaps.append((km, kmi))
 
@@ -180,6 +191,8 @@ def unregister_keymaps():
     for km, kmi in addon_keymaps:
         km.keymap_items.remove(kmi)
     addon_keymaps.clear()
+# -----------------------------------------------------------------------------
+
 
 classes = [
     StartupSceneMasterPreferences,
