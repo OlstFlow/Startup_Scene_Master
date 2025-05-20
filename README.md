@@ -8,12 +8,12 @@ If you work on multiple types of projects, this saves you from setting up the de
 ## 📷 Screenshots & Demo
 
 <p align="center">
-  <img src="media/Menu.gif" width="400"/><br>
+  <img src="media/Menu.gif" width="600"/><br>
   <em>How to open the template menu (F7 by default)</em>
 </p>
 
 <p align="center">
-  <img src="media/Addon.jpg" width="400"/><br>
+  <img src="media/Addon.jpg" width="600"/><br>
   <em>Add-on Preferences and Hotkey</em>
 </p>
 
