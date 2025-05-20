@@ -7,13 +7,14 @@ If you work on multiple types of projects, this saves you from setting up the de
 
 ## 📷 Screenshots & Demo
 
+**How to open the template menu (press F7 by default):**
+
+![Menu Demo](media/Menu.gif)
+
 **Addon preferences and hotkey:**
 
 ![Addon Preferences](media/Addon.jpg)
 
-**How to open the template menu (press F7 by default):**
-
-![Menu Demo](media/Menu.gif)
 
 ---
 
